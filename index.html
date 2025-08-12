@@ -108,10 +108,10 @@
   <div class="container">
     <div class="header">
       <div class="title">
-        <h1>Maandelijkse Expense Tracker</h1>
-        <span class="subtitle">Categorieën: Housing, Food, Transportation, Entertainment</span>
+        <h1>Monthly Expense Tracker</h1>
+        <span class="subtitle">Categories: Housing, Food, Transportation, Entertainment</span>
       </div>
-      <div class="small muted" id="monthLabel">Maand</div>
+      <div class="small muted" id="monthLabel">Month</div>
     </div>
 
     <div class="grid">
@@ -121,17 +121,17 @@
           <div class="summary">
             <div class="totals">
               <div>
-                <div class="small">Totaal uitgegeven</div>
+                <div class="small">Total spent</div>
                 <div class="big">€ <span id="totalSpent">0.00</span></div>
               </div>
               <div>
-                <div class="small">Totaal budget</div>
+                <div class="small">Total budget</div>
                 <div class="big">€ <span id="totalBudget">0.00</span></div>
               </div>
             </div>
             <div class="space"></div>
             <div style="text-align:right">
-              <div class="small">Resterend</div>
+              <div class="small">Remaining</div>
               <div class="big">€ <span id="remaining">0.00</span></div>
             </div>
           </div>
@@ -145,34 +145,34 @@
           </div>
 
           <div class="footer-actions">
-            <button class="btn ghost" id="resetBtn">Reset maand</button>
-            <button class="btn primary" id="saveBtn">Opslaan</button>
+            <button class="btn ghost" id="resetBtn">Reset month</button>
+            <button class="btn primary" id="saveBtn">Save</button>
           </div>
         </div>
 
         <div style="height:12px"></div>
 
         <div class="card" style="text-align:center;font-size:13px;color:var(--muted)">
-          Tip: Klik op een categorie om het budget aan te passen of voeg direct een uitgave toe.
+          Tip: Click on a category to adjust the budget or add an expense directly.
         </div>
       </div>
 
       <!-- right: chart -->
       <div>
         <div class="card chart-area">
-          <h3 style="margin:0">Uitgaven verdeling</h3>
+          <h3 style="margin:0">Expense allocation</h3>
           <canvas id="pieChart" width="320" height="320" aria-label="Uitgaven verdeling" role="img"></canvas>
-          <div class="small muted">Klik op de legenda om categorieën in/uit te schakelen.</div>
+          <div class="small muted">Click on the legend to enable/disable categories.</div>
         </div>
 
         <div style="height:12px"></div>
 
         <div class="card">
-          <h4 style="margin:0 0 8px 0">Acties</h4>
+          <h4 style="margin:0 0 8px 0">Actions</h4>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn" id="exportBtn">Export JSON</button>
             <button class="btn" id="importBtn">Import JSON</button>
-            <button class="btn ghost" id="clearStorageBtn">Verwijder opgeslagen</button>
+            <button class="btn ghost" id="clearStorageBtn">Delete saved</button>
           </div>
         </div>
       </div>
