@@ -1,0 +1,440 @@
+<!-- Expense Tracker Widget - Single File
+     Features:
+     - Category-based inputs (housing, food, transportation, entertainment)
+     - Set and edit budget limits per category
+     - Progress bars (green = under budget, red = over budget)
+     - Pie chart breakdown (Chart.js CDN)
+     - Running totals
+     - Save/load to localStorage
+     - Toast notifications for budget alerts
+     - Clean card layout and smooth animations
+-->
+
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monthly Expense Tracker Widget</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --muted: #7b8794;
+      --accent: #4f46e5;
+      --success: #16a34a;
+      --danger: #ef4444;
+      --glass: rgba(255,255,255,0.7);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:#0f172a;padding:24px}
+    .container{max-width:920px;margin:0 auto}
+
+    /* Header */
+    .header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .title{display:flex;flex-direction:column}
+    h1{margin:0;font-size:20px;font-weight:700}
+    .subtitle{color:var(--muted);font-size:13px}
+
+    /* Grid */
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
+    @media (max-width:880px){.grid{grid-template-columns:1fr}}
+
+    /* Card */
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(15,23,42,0.06);}
+
+    /* Summary */
+    .summary{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .summary .totals{display:flex;gap:16px;align-items:center}
+    .big{font-size:18px;font-weight:700}
+    .small{font-size:13px;color:var(--muted)}
+
+    /* Categories */
+    .categories{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+    @media (max-width:560px){.categories{grid-template-columns:1fr}}
+    .category{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(250,250,255,0.9));}
+    .cat-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .cat-name{font-weight:600}
+    .cat-meta{font-size:13px;color:var(--muted)}
+
+    .controls{display:flex;gap:8px;margin-top:10px}
+    .controls input[type="number"]{flex:1;padding:8px;border-radius:8px;border:1px solid #e6e9ef}
+    .controls button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer;transition:transform .12s ease}
+    .controls button:active{transform:scale(.98)}
+
+    .progress-wrap{margin-top:12px}
+    .progress{height:12px;background:#eef2ff;border-radius:999px;overflow:hidden}
+    .progress > i{display:block;height:100%;width:0%;transition:width .6s cubic-bezier(.2,.9,.2,1), background .3s}
+    .remaining{margin-top:8px;font-size:13px;color:var(--muted)}
+
+    /* Chart area */
+    .chart-area{display:flex;flex-direction:column;align-items:center;gap:8px}
+    canvas{max-width:100%}
+
+    /* Budgets editor */\    
+    .budgets-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .budget-input{display:flex;gap:6px;align-items:center;background:#fbfdff;border-radius:8px;padding:6px 8px;border:1px solid #eef2ff}
+    .budget-input input{width:84px;padding:6px;border:0;background:transparent;font-weight:600}
+    .budget-input label{font-size:13px;color:var(--muted)}
+
+    /* Footer buttons */
+    .footer-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    .btn{padding:10px 12px;border-radius:10px;border:0;cursor:pointer;font-weight:600}
+    .btn.ghost{background:transparent;border:1px solid #e6e9ef}
+    .btn.primary{background:var(--accent);color:white}
+
+    /* Toasts */
+    .toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:1000}
+    .toast{min-width:220px;background:#0f172a;color:white;padding:10px 12px;border-radius:8px;box-shadow:0 6px 18px rgba(2,6,23,0.3);opacity:0;transform:translateY(8px) scale(.98);animation:toastIn .28s forwards}
+    .toast.warn{background:#b45309}
+    .toast.danger{background:var(--danger)}
+    @keyframes toastIn{to{opacity:1;transform:none}}
+
+    /* Tiny helpers */
+    .muted{color:var(--muted)}
+    .flex{display:flex;align-items:center}
+    .space{flex:1}
+
+    /* subtle animations for card updates */
+    .pulse{animation:pulse .9s}
+    @keyframes pulse{50%{transform:scale(1.01)}100%{transform:none}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title">
+        <h1>Maandelijkse Expense Tracker</h1>
+        <span class="subtitle">Categorieën: Housing, Food, Transportation, Entertainment</span>
+      </div>
+      <div class="small muted" id="monthLabel">Maand</div>
+    </div>
+
+    <div class="grid">
+      <!-- left: controls and categories -->
+      <div>
+        <div class="card">
+          <div class="summary">
+            <div class="totals">
+              <div>
+                <div class="small">Totaal uitgegeven</div>
+                <div class="big">€ <span id="totalSpent">0.00</span></div>
+              </div>
+              <div>
+                <div class="small">Totaal budget</div>
+                <div class="big">€ <span id="totalBudget">0.00</span></div>
+              </div>
+            </div>
+            <div class="space"></div>
+            <div style="text-align:right">
+              <div class="small">Resterend</div>
+              <div class="big">€ <span id="remaining">0.00</span></div>
+            </div>
+          </div>
+
+          <div class="categories" id="categoriesContainer">
+            <!-- category cards injected here -->
+          </div>
+
+          <div class="budgets-row" id="budgetsEditor">
+            <!-- budget quick editor injected here -->
+          </div>
+
+          <div class="footer-actions">
+            <button class="btn ghost" id="resetBtn">Reset maand</button>
+            <button class="btn primary" id="saveBtn">Opslaan</button>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="card" style="text-align:center;font-size:13px;color:var(--muted)">
+          Tip: Klik op een categorie om het budget aan te passen of voeg direct een uitgave toe.
+        </div>
+      </div>
+
+      <!-- right: chart -->
+      <div>
+        <div class="card chart-area">
+          <h3 style="margin:0">Uitgaven verdeling</h3>
+          <canvas id="pieChart" width="320" height="320" aria-label="Uitgaven verdeling" role="img"></canvas>
+          <div class="small muted">Klik op de legenda om categorieën in/uit te schakelen.</div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="card">
+          <h4 style="margin:0 0 8px 0">Acties</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" id="exportBtn">Export JSON</button>
+            <button class="btn" id="importBtn">Import JSON</button>
+            <button class="btn ghost" id="clearStorageBtn">Verwijder opgeslagen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast container -->
+  <div class="toasts" id="toasts"></div>
+
+  <script>
+    // Categories config
+    const DEFAULT_CATEGORIES = [
+      {key:'housing', name:'Housing', budget:800, spent:0},
+      {key:'food', name:'Food', budget:400, spent:0},
+      {key:'transportation', name:'Transportation', budget:300, spent:0},
+      {key:'entertainment', name:'Entertainment', budget:500, spent:0}
+    ];
+
+    const STORAGE_KEY = 'expenseTracker_v1';
+    let categories = {};
+    let pieChart = null;
+
+    // fill month label
+    function setMonthLabel(){
+      const now = new Date();
+      const opts = {year:'numeric', month:'long'};
+      document.getElementById('monthLabel').innerText = now.toLocaleDateString('nl-NL', opts);
+    }
+
+    // load from storage or defaults
+    function load(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        try{
+          const parsed = JSON.parse(raw);
+          // ensure defaults keys exist
+          DEFAULT_CATEGORIES.forEach(dc=>{
+            categories[dc.key] = parsed[dc.key] ? parsed[dc.key] : {budget:dc.budget, spent:0, name:dc.name};
+          });
+        }catch(e){
+          console.error('Parsel error', e);
+          resetToDefaults();
+        }
+      }else{
+        resetToDefaults();
+      }
+    }
+
+    function resetToDefaults(){
+      categories = {};
+      DEFAULT_CATEGORIES.forEach(dc => categories[dc.key] = {name:dc.name, budget:dc.budget, spent:0});
+    }
+
+    // save
+    function save(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+      toast('Opslaan succesvol', 'info');
+    }
+
+    function clearSaved(){
+      localStorage.removeItem(STORAGE_KEY);
+      resetToDefaults();
+      render();
+      toast('Opgeslagen data verwijderd', 'info');
+    }
+
+    // export/import
+    function exportJSON(){
+      const dataStr = JSON.stringify({meta:{exportedAt:new Date().toISOString()}, categories}, null, 2);
+      const blob = new Blob([dataStr], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'expenses-export.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJSON(){
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = 'application/json';
+      input.onchange = e => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try{
+            const parsed = JSON.parse(reader.result);
+            if(parsed.categories){
+              Object.keys(parsed.categories).forEach(k => { if(categories[k]){ categories[k].budget = parsed.categories[k].budget ?? categories[k].budget; categories[k].spent = parsed.categories[k].spent ?? categories[k].spent; }});
+              render();
+              toast('Import succesvol', 'info');
+            }else{
+              toast('Ongeldig bestand', 'danger');
+            }
+          }catch(err){
+            toast('Fout bij import: ' + err.message, 'danger');
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    // UI helpers
+    function el(tag, opts = {}){
+      const e = document.createElement(tag);
+      if(opts.cls) e.className = opts.cls;
+      if(opts.html) e.innerHTML = opts.html;
+      if(opts.text) e.textContent = opts.text;
+      if(opts.attrs) Object.entries(opts.attrs).forEach(([k,v])=>e.setAttribute(k,v));
+      return e;
+    }
+
+    function toast(message, type='info', timeout=3800){
+      const t = el('div',{cls:'toast' + (type==='warn'? ' warn':'') + (type==='danger' ? ' danger':'')});
+      t.textContent = message;
+      const holder = document.getElementById('toasts');
+      holder.appendChild(t);
+      setTimeout(()=>{ t.style.opacity = '0'; t.style.transform = 'translateY(8px) scale(.98)'; }, timeout);
+      setTimeout(()=>t.remove(), timeout + 420);
+    }
+
+    // create category cards
+    function createCategoryCard(key, data){
+      const wrap = el('div',{cls:'category', attrs:{'data-key':key}});
+      const head = el('div',{cls:'cat-head'});
+      head.appendChild(el('div',{cls:'cat-name', text:data.name}));
+      const meta = el('div',{cls:'cat-meta', html:`€ <span class="spent">${data.spent.toFixed(2)}</span> / € <span class="budget">${data.budget.toFixed(2)}</span>`});
+      head.appendChild(meta);
+      wrap.appendChild(head);
+
+      const controls = el('div',{cls:'controls'});
+      const input = el('input',{attrs:{type:'number', min:'0', step:'0.01', placeholder:'Voeg uitgave toe'}});
+      input.className = 'addInput';
+      const addBtn = el('button',{cls:'', text:'Toevoegen'});
+      controls.appendChild(input); controls.appendChild(addBtn);
+      wrap.appendChild(controls);
+
+      const progressWrap = el('div',{cls:'progress-wrap'});
+      const progress = el('div',{cls:'progress'});
+      const fill = el('i');
+      progress.appendChild(fill);
+      progressWrap.appendChild(progress);
+      progressWrap.appendChild(el('div',{cls:'remaining', html:`<span class="muted">Resterend:</span> € <span class="remainVal">0.00</span>`}))
+      wrap.appendChild(progressWrap);
+
+      // budget edit on click of budget text
+      meta.addEventListener('click', ()=>{
+        const newBudget = prompt(`Nieuw budget voor ${data.name} (huidig €${data.budget.toFixed(2)}):`, data.budget);
+        if(newBudget!==null){
+          const val = parseFloat(newBudget);
+          if(!isNaN(val) && val>=0){ categories[key].budget = val; render(); toast('Budget bijgewerkt', 'info'); }
+        }
+      });
+
+      addBtn.addEventListener('click', ()=>{
+        const amt = parseFloat(input.value);
+        if(isNaN(amt) || amt<=0){ toast('Voer een geldig bedrag in', 'warn'); return; }
+        categories[key].spent += amt;
+        input.value = '';
+        render();
+        checkAlerts(key);
+      });
+
+      // quick-add on enter
+      input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ addBtn.click(); }});
+
+      return wrap;
+    }
+
+    // render all
+    function render(){
+      // inject category cards
+      const container = document.getElementById('categoriesContainer');
+      container.innerHTML = '';
+      Object.entries(categories).forEach(([k,v])=> container.appendChild(createCategoryCard(k,v)));
+
+      // budgets editor
+      const budgetsEditor = document.getElementById('budgetsEditor'); budgetsEditor.innerHTML = '';
+      Object.entries(categories).forEach(([k,v]) =>{
+        const bi = el('div',{cls:'budget-input'});
+        bi.appendChild(el('label',{text:v.name}));
+        const inp = el('input',{attrs:{type:'number',value:v.budget,min:'0',step:'1'}});
+        inp.addEventListener('change', ()=>{ categories[k].budget = parseFloat(inp.value); render(); toast('Budget aangepast', 'info'); });
+        bi.appendChild(inp);
+        budgetsEditor.appendChild(bi);
+      });
+
+      // update totals & progress bars
+      let totalSpent = 0, totalBudget = 0;
+      Object.entries(categories).forEach(([k,v])=>{ totalSpent += v.spent; totalBudget += v.budget; });
+      const remaining = totalBudget - totalSpent;
+      document.getElementById('totalSpent').innerText = totalSpent.toFixed(2);
+      document.getElementById('totalBudget').innerText = totalBudget.toFixed(2);
+      document.getElementById('remaining').innerText = remaining.toFixed(2);
+
+      // update each card's displayed spent/budget and progress
+      document.querySelectorAll('.category').forEach(card =>{
+        const key = card.getAttribute('data-key'); const v = categories[key];
+        card.querySelector('.spent').innerText = v.spent.toFixed(2);
+        card.querySelector('.budget').innerText = v.budget.toFixed(2);
+        const pct = v.budget>0 ? (v.spent / v.budget) : 1;
+        const fill = card.querySelector('i');
+        const widthPct = Math.min(pct, 1) * 100;
+        fill.style.width = widthPct + '%';
+        fill.style.background = (v.spent <= v.budget) ? 'linear-gradient(90deg, var(--success), #34d399)' : 'linear-gradient(90deg, var(--danger), #f97316)';
+        card.querySelector('.remainVal').innerText = Math.max(v.budget - v.spent, 0).toFixed(2);
+        // pulse animation for updated card
+        card.classList.add('pulse'); setTimeout(()=>card.classList.remove('pulse'), 700);
+      });
+
+      updateChart();
+    }
+
+    function checkAlerts(key){
+      const cat = categories[key];
+      if(cat.budget <=0) return;
+      const ratio = cat.spent / cat.budget;
+      if(ratio >= 1){
+        toast(`${cat.name} budget overschreden! (€${cat.spent.toFixed(2)} / €${cat.budget.toFixed(2)})`, 'danger');
+      }else if(ratio >= 0.8){
+        toast(`${cat.name} bijna op: ${Math.round(ratio*100)}% gebruikt`, 'warn');
+      }
+    }
+
+    // chart
+    function updateChart(){
+      const ctx = document.getElementById('pieChart').getContext('2d');
+      const labels = Object.values(categories).map(c=>c.name);
+      const data = Object.values(categories).map(c=>c.spent);
+      const bg = ['#ff9999','#66b3ff','#99ff99','#ffcc99'];
+      if(pieChart) pieChart.destroy();
+      pieChart = new Chart(ctx, {
+        type:'pie',
+        data:{labels, datasets:[{data, backgroundColor:bg}]},
+        options:{plugins:{legend:{position:'bottom'}}, animation:{easing:'easeOutQuart',duration:600}}
+      });
+    }
+
+    // reset month (clear spent but keep budgets)
+    function resetMonth(){
+      Object.keys(categories).forEach(k=> categories[k].spent = 0);
+      render();
+      toast('Maand gereset (uitgaven gewist)', 'info');
+    }
+
+    // init
+    document.addEventListener('DOMContentLoaded', ()=>{
+      setMonthLabel();
+      load();
+      render();
+
+      document.getElementById('saveBtn').addEventListener('click', save);
+      document.getElementById('resetBtn').addEventListener('click', ()=>{ if(confirm('Weet je zeker dat je deze maand wil resetten (alle uitgaven gewist)?')) resetMonth(); });
+      document.getElementById('exportBtn').addEventListener('click', exportJSON);
+      document.getElementById('importBtn').addEventListener('click', importJSON);
+      document.getElementById('clearStorageBtn').addEventListener('click', ()=>{ if(confirm('Verwijder opgeslagen data?')) clearSaved(); });
+
+      // keyboard shortcut: S to save
+      document.addEventListener('keydown', e=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); save(); }});
+    });
+  </script>
+</body>
+</html>
